@@ -1,6 +1,5 @@
 package com.jaydots.dailybudgetcountdown
 
-
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -33,15 +32,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import java.text.NumberFormat
+import java.util.Locale
 
 // Route names for navigation
 private object Routes {
     const val WELCOME = "welcome"
     const val BUDGET_ENTRY = "budget_entry"
+    const val BUDGET_SUMMARY = "budget_summary/{amount}"
+
+    fun budgetSummary(amount: Double) = "budget_summary/$amount"
 }
 
 class MainActivity : ComponentActivity() {
@@ -61,7 +68,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppNavHost(navController: NavHostController = rememberNavController()) {
+fun AppNavHost(
+    navController: NavHostController = rememberNavController(),
+    budgetViewModel: BudgetViewModel = viewModel()
+) {
     NavHost(navController = navController, startDestination = Routes.WELCOME) {
         composable(Routes.WELCOME) {
             WelcomeScreen(onGetStartedClick = {
@@ -69,9 +79,18 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             })
         }
         composable(Routes.BUDGET_ENTRY) {
-            BudgetEntryScreen(onSubmitClick = { budgetAmount ->
-                // TODO: Handle the submitted budget amount (save it, start the countdown, etc.)
+            BudgetEntryScreen(onSubmitClick = { amount ->
+                budgetViewModel.saveBudget(amount) { savedAmount ->
+                    navController.navigate(Routes.budgetSummary(savedAmount))
+                }
             })
+        }
+        composable(
+            route = Routes.BUDGET_SUMMARY,
+            arguments = listOf(navArgument("amount") { type = NavType.FloatType })
+        ) { backStackEntry ->
+            val amount = backStackEntry.arguments?.getFloat("amount")?.toDouble() ?: 0.0
+            BudgetSummaryScreen(budgetAmount = amount)
         }
     }
 }
@@ -127,7 +146,7 @@ fun WelcomeScreen(onGetStartedClick: () -> Unit) {
 }
 
 @Composable
-fun BudgetEntryScreen(onSubmitClick: (String) -> Unit) {
+fun BudgetEntryScreen(onSubmitClick: (Double) -> Unit) {
     var budgetInput by remember { mutableStateOf("") }
 
     Column(
@@ -180,7 +199,12 @@ fun BudgetEntryScreen(onSubmitClick: (String) -> Unit) {
 
         // Submit button
         Button(
-            onClick = { onSubmitClick(budgetInput) },
+            onClick = {
+                val amount = budgetInput.toDoubleOrNull()
+                if (amount != null) {
+                    onSubmitClick(amount)
+                }
+            },
             enabled = budgetInput.isNotBlank(),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(
@@ -198,6 +222,30 @@ fun BudgetEntryScreen(onSubmitClick: (String) -> Unit) {
                 fontWeight = FontWeight.Bold
             )
         }
+    }
+}
+
+@Composable
+fun BudgetSummaryScreen(budgetAmount: Double) {
+    val formattedAmount = remember(budgetAmount) {
+        NumberFormat.getCurrencyInstance(Locale.getDefault()).format(budgetAmount)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = formattedAmount,
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
@@ -223,6 +271,19 @@ fun BudgetEntryScreenPreview() {
             color = Color.White
         ) {
             BudgetEntryScreen(onSubmitClick = {})
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFFFFFFFF)
+@Composable
+fun BudgetSummaryScreenPreview() {
+    MaterialTheme {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color.White
+        ) {
+            BudgetSummaryScreen(budgetAmount = 45.5)
         }
     }
 }
