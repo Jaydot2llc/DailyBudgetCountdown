@@ -5,3 +5,5 @@ This is a micro-budgeting application that allows users to track their spending 
 ## Additional Libraries
 
 The Jetpack Navigation library is used in this application.
+
+The Room library is used for local data persistence.
