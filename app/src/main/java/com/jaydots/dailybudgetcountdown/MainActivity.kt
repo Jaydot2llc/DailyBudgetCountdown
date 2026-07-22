@@ -249,8 +249,8 @@ fun BudgetSummaryScreen(budgetId: Int, budgetViewModel: BudgetViewModel = viewMo
         // Total budget value
         Text(
             text = budget?.let { currencyFormatter.format(it.totalBudget) } ?: "",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Normal,
             color = Color.Black,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth()
@@ -259,8 +259,8 @@ fun BudgetSummaryScreen(budgetId: Int, budgetViewModel: BudgetViewModel = viewMo
         // Remaining budget value, shown underneath the total
         Text(
             text = budget?.let { "Remaining: ${currencyFormatter.format(it.remainingBudget)}" } ?: "",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Normal,
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Bold,
             color = Color.Black,
             textAlign = TextAlign.Center,
             modifier = Modifier
