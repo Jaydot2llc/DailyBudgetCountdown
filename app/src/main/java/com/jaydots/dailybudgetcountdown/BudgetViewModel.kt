@@ -18,6 +18,9 @@ class BudgetViewModel(application: Application) : AndroidViewModel(application) 
     private val _currentBudget = MutableStateFlow<BudgetEntity?>(null)
     val currentBudget: StateFlow<BudgetEntity?> = _currentBudget.asStateFlow()
 
+    private val _transactions = MutableStateFlow<List<TransactionEntity>>(emptyList())
+    val transactions: StateFlow<List<TransactionEntity>> = _transactions.asStateFlow()
+
     /**
      * Saves [amount] into the budget table.
      * If a budget row was created within the last 24 hours, it is updated/replaced
@@ -50,6 +53,10 @@ class BudgetViewModel(application: Application) : AndroidViewModel(application) 
                 savedBudget = newBudget.copy(id = newId)
             }
 
+            // Setting a budget starts the day fresh, so clear out any past transactions.
+            transactionDao.deleteAll()
+            _transactions.value = emptyList()
+
             _currentBudget.value = savedBudget
             onSaved(savedBudget.id, savedBudget.totalBudget)
         }
@@ -62,10 +69,18 @@ class BudgetViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /** Loads all transactions recorded against [budgetId] into [transactions]. */
+    fun loadTransactions(budgetId: Int) {
+        viewModelScope.launch {
+            _transactions.value = transactionDao.getTransactionsForBudget(budgetId)
+        }
+    }
+
     /**
      * Records a transaction against [budgetId]: inserts a row into the transaction
      * table, then subtracts [cost] from that budget's remainingBudget and persists
-     * the update. Calls [onComplete] once both writes finish.
+     * the update. Refreshes both [currentBudget] and [transactions]. Calls
+     * [onComplete] once all writes finish.
      */
     fun recordTransaction(
         budgetId: Int,
@@ -91,6 +106,8 @@ class BudgetViewModel(application: Application) : AndroidViewModel(application) 
                 budgetDao.update(updatedBudget)
                 _currentBudget.value = updatedBudget
             }
+
+            _transactions.value = transactionDao.getTransactionsForBudget(budgetId)
 
             onComplete()
         }

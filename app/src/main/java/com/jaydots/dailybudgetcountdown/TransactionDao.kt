@@ -11,4 +11,7 @@ interface TransactionDao {
 
     @Query("SELECT * FROM `transaction` WHERE budgetId = :budgetId ORDER BY createdAt DESC")
     suspend fun getTransactionsForBudget(budgetId: Int): List<TransactionEntity>
+
+    @Query("DELETE FROM `transaction`")
+    suspend fun deleteAll()
 }

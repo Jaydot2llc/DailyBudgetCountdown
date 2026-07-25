@@ -5,13 +5,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -49,8 +53,10 @@ private object Routes {
     const val WELCOME = "welcome"
     const val BUDGET_ENTRY = "budget_entry"
     const val BUDGET_SUMMARY = "budget_summary/{budgetId}"
+    const val PURCHASES = "purchases/{budgetId}"
 
     fun budgetSummary(budgetId: Int) = "budget_summary/$budgetId"
+    fun purchases(budgetId: Int) = "purchases/$budgetId"
 }
 
 class MainActivity : ComponentActivity() {
@@ -92,7 +98,24 @@ fun AppNavHost(
             arguments = listOf(navArgument("budgetId") { type = NavType.IntType })
         ) { backStackEntry ->
             val budgetId = backStackEntry.arguments?.getInt("budgetId") ?: 0
-            BudgetSummaryScreen(budgetId = budgetId, budgetViewModel = budgetViewModel)
+            BudgetSummaryScreen(
+                budgetId = budgetId,
+                budgetViewModel = budgetViewModel,
+                onShowPurchasesClick = {
+                    navController.navigate(Routes.purchases(budgetId))
+                }
+            )
+        }
+        composable(
+            route = Routes.PURCHASES,
+            arguments = listOf(navArgument("budgetId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val budgetId = backStackEntry.arguments?.getInt("budgetId") ?: 0
+            PurchasesScreen(
+                budgetId = budgetId,
+                budgetViewModel = budgetViewModel,
+                onBackClick = { navController.popBackStack() }
+            )
         }
     }
 }
@@ -228,7 +251,11 @@ fun BudgetEntryScreen(onSubmitClick: (Double) -> Unit) {
 }
 
 @Composable
-fun BudgetSummaryScreen(budgetId: Int, budgetViewModel: BudgetViewModel = viewModel()) {
+fun BudgetSummaryScreen(
+    budgetId: Int,
+    budgetViewModel: BudgetViewModel = viewModel(),
+    onShowPurchasesClick: () -> Unit = {}
+) {
     val budget by budgetViewModel.currentBudget.collectAsState()
     var showUseMoneyDialog by remember { mutableStateOf(false) }
 
@@ -246,17 +273,8 @@ fun BudgetSummaryScreen(budgetId: Int, budgetViewModel: BudgetViewModel = viewMo
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Total budget value
-        Text(
-            text = budget?.let { currencyFormatter.format(it.totalBudget) } ?: "",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Normal,
-            color = Color.Black,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
 
-        // Remaining budget value, shown underneath the total
+        // Remaining budget value
         Text(
             text = budget?.let { "Remaining: ${currencyFormatter.format(it.remainingBudget)}" } ?: "",
             fontSize = 32.sp,
@@ -266,6 +284,16 @@ fun BudgetSummaryScreen(budgetId: Int, budgetViewModel: BudgetViewModel = viewMo
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp)
+        )
+
+        // Total budget value, shown underneath remaining budget
+        Text(
+            text = budget?.let { currencyFormatter.format(it.totalBudget) } ?: "",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Normal,
+            color = Color.Black,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
         )
 
         // Use Money button
@@ -283,6 +311,26 @@ fun BudgetSummaryScreen(budgetId: Int, budgetViewModel: BudgetViewModel = viewMo
         ) {
             Text(
                 text = "Use Money",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        // Show Purchases button
+        Button(
+            onClick = onShowPurchasesClick,
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF808080),
+                contentColor = Color.White
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+                .padding(top = 16.dp)
+        ) {
+            Text(
+                text = "Show Purchases",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -376,6 +424,99 @@ fun UseMoneyDialog(
     }
 }
 
+@Composable
+fun PurchasesScreen(
+    budgetId: Int,
+    budgetViewModel: BudgetViewModel = viewModel(),
+    onBackClick: () -> Unit = {}
+) {
+    val transactions by budgetViewModel.transactions.collectAsState()
+    val currencyFormatter = remember { NumberFormat.getCurrencyInstance(Locale.getDefault()) }
+
+    androidx.compose.runtime.LaunchedEffect(budgetId) {
+        budgetViewModel.loadTransactions(budgetId)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+    ) {
+        Text(
+            text = "Today's Purchases",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        if (transactions.isEmpty()) {
+            Text(
+                text = "No purchases recorded yet.",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Normal,
+                color = Color.Black,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(top = 32.dp)
+            )
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(top = 16.dp)
+            ) {
+                items(transactions) { transaction ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp)
+                    ) {
+                        Text(
+                            text = transaction.description,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = Color.Black,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = currencyFormatter.format(transaction.cost),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                    }
+                    Divider()
+                }
+            }
+        }
+
+        // Back button
+        Button(
+            onClick = onBackClick,
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF808080),
+                contentColor = Color.White
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+                .padding(top = 16.dp)
+        ) {
+            Text(
+                text = "Back to Budget Summary",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
 @Preview(showBackground = true, backgroundColor = 0xFFFFFFFF)
 @Composable
 fun WelcomeScreenPreview() {
@@ -407,5 +548,18 @@ fun BudgetEntryScreenPreview() {
 fun UseMoneyDialogPreview() {
     MaterialTheme {
         UseMoneyDialog(onDismiss = {}, onSubmit = { _, _ -> })
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFFFFFFFF)
+@Composable
+fun PurchasesScreenPreview() {
+    MaterialTheme {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color.White
+        ) {
+            PurchasesScreen(budgetId = 0)
+        }
     }
 }
